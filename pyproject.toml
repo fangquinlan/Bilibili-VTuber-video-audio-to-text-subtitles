@@ -7,7 +7,7 @@ name = "vtuber-subtitles"
 version = "0.1.0"
 description = "One-click Bilibili VTuber audio-to-txt subtitle pipeline with Mini-BS-RoFormer-V2 and FireRedASR2-AED."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [project.scripts]
 vtuber-subtitles = "vtuber_subtitles.cli:main"

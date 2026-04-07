@@ -15,6 +15,7 @@
 - AutoDL Linux 服务器
 - 25 核 CPU + RTX 5090
 - Conda 已可用
+- Python 3.11+（脚本会默认创建 / 修正到 3.11 环境）
 - 可以联网下载 Python 依赖与模型
 - 默认无需登录 cookies；只有遇到访问限制时再传 `--cookies`
 
@@ -55,6 +56,8 @@ bash scripts/autodl_one_click.sh
 ```bash
 CONDA_CREATE_CHANNELS="defaults" python3 scripts/autodl_one_click.py
 ```
+
+如果之前已经创建过 `vtuber_subtitles`，但里面还是 Python 3.10，脚本也会自动把它升级到 Python 3.11 后再继续装依赖。
 
 ## 可选参数
 
