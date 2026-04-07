@@ -1,0 +1,14 @@
+cn2an==0.5.23
+einops>=0.8.0
+huggingface_hub>=0.31.0
+kaldi_native_fbank==1.15
+kaldiio==2.18.0
+librosa>=0.10.2
+modelscope>=1.24.0
+numpy==1.26.4
+sentencepiece==0.1.99
+soundfile==0.13.1
+textgrid==1.6.1
+tqdm>=4.67.1
+transformers==4.55.4
+yt-dlp>=2026.3.31

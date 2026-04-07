@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+_vendor_firered/
+temp_repo_inspect/
+workspace/
+build/
+dist/
+*.egg-info/
