@@ -85,6 +85,11 @@ python3 scripts/autodl_run.py
 python3 scripts/autodl_run.py --cookies /path/to/cookies.txt
 ```
 
+这份 cookies 现在也会同时用于：
+
+- `yt-dlp` 下载受限视频
+- `space/search` 自动抓链接时的 B 站搜索请求
+
 你现在这批链接直接放进根目录的 `input.txt` 就能跑，不需要额外改代码。
 
 如果你要从切片员频道里自动筛选，比如：

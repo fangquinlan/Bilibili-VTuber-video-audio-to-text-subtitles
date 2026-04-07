@@ -127,11 +127,12 @@ def resolve_space_search_urls(
     space_search_url: str,
     title_must_contain: str | None = None,
     max_duration_minutes: float = 0.0,
+    cookies: Path | None = None,
     limit: int | None = None,
 ) -> list[str]:
     mid, keyword = _parse_space_search_url(space_search_url)
     max_duration_seconds = max(0.0, max_duration_minutes) * 60.0
-    session = _BilibiliSpaceSearchSession(space_search_url)
+    session = _BilibiliSpaceSearchSession(space_search_url, cookie_file=cookies)
 
     first_page = session.fetch_page(mid=mid, keyword=keyword, page_number=1)
     page_size = int(first_page["page"]["ps"])
@@ -367,11 +368,12 @@ def _load_url_order_manifest(path: Path | None) -> dict[str, int]:
 
 
 class _BilibiliSpaceSearchSession:
-    def __init__(self, referer_url: str) -> None:
+    def __init__(self, referer_url: str, *, cookie_file: Path | None = None) -> None:
         self.referer_url = referer_url
-        self.cookie_jar = http.cookiejar.CookieJar()
+        self.cookie_jar = self._build_cookie_jar(cookie_file)
         self.opener = build_opener(HTTPCookieProcessor(self.cookie_jar))
         self._wbi_key_cache: tuple[str, float] | None = None
+        self.cookie_file = cookie_file
 
     def fetch_page(self, *, mid: str, keyword: str, page_number: int) -> dict[str, object]:
         self._prime_session()
@@ -441,6 +443,26 @@ class _BilibiliSpaceSearchSession:
                     "Accept-Language": "zh-CN,zh;q=0.9",
                 },
             )
+
+    @staticmethod
+    def _build_cookie_jar(cookie_file: Path | None) -> http.cookiejar.CookieJar:
+        if cookie_file is None:
+            return http.cookiejar.CookieJar()
+
+        jar = http.cookiejar.MozillaCookieJar(str(cookie_file))
+        try:
+            jar.load(ignore_discard=True, ignore_expires=True)
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(f"Cookie file was not found: {cookie_file}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load cookie file: {cookie_file}") from exc
+
+        logger.info(
+            "Loaded %d cookies from %s for Bilibili space search requests.",
+            sum(1 for _ in jar),
+            cookie_file,
+        )
+        return jar
 
     def _get_wbi_key(self, video_id: str) -> str:
         if self._wbi_key_cache is not None and time.time() < self._wbi_key_cache[1] + 30:

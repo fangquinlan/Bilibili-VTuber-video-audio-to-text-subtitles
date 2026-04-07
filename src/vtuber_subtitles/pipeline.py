@@ -201,6 +201,7 @@ class SeriesPipeline:
                 space_search_url=self.config.space_search_url,
                 title_must_contain=self.config.title_must_contain,
                 max_duration_minutes=self.config.max_duration_minutes,
+                cookies=self.config.cookies,
                 limit=self.config.limit,
             )
             return download_audio_urls(

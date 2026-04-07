@@ -50,6 +50,7 @@ def build_base_command() -> list[str]:
     append_optional_env_arg(args, "MAX_DURATION_MINUTES", "--max-duration-minutes")
     if "MAX_DURATION_MINUTES" not in os.environ:
         append_optional_env_arg(args, "MIN_DURATION_MINUTES", "--max-duration-minutes")
+    append_optional_env_arg(args, "COOKIES", "--cookies")
     append_optional_env_arg(args, "SEPARATOR_CHUNK_SECONDS", "--separator-chunk-seconds")
     append_optional_env_arg(args, "SEPARATOR_OVERLAP_SECONDS", "--separator-overlap-seconds")
     append_optional_env_arg(args, "SEPARATOR_BATCH_SIZE", "--separator-batch-size")
