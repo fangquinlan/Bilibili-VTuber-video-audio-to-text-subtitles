@@ -31,7 +31,7 @@ class SeriesPipelineConfig:
     series_url: str = DEFAULT_SERIES_URL
     space_search_url: str | None = None
     title_must_contain: str | None = None
-    min_duration_minutes: float = 0.0
+    max_duration_minutes: float = 0.0
     input_file: Path | None = None
     output_root: Path = Path("workspace/bilibili_series_2004017")
     cookies: Path | None = None
@@ -200,7 +200,7 @@ class SeriesPipeline:
             urls = resolve_space_search_urls(
                 space_search_url=self.config.space_search_url,
                 title_must_contain=self.config.title_must_contain,
-                min_duration_minutes=self.config.min_duration_minutes,
+                max_duration_minutes=self.config.max_duration_minutes,
                 limit=self.config.limit,
             )
             return download_audio_urls(
@@ -373,7 +373,7 @@ class SeriesPipeline:
             "series_url": self.config.series_url,
             "space_search_url": self.config.space_search_url,
             "title_must_contain": self.config.title_must_contain,
-            "min_duration_minutes": self.config.min_duration_minutes,
+            "max_duration_minutes": self.config.max_duration_minutes,
             "input_file": str(self.config.input_file) if self.config.input_file is not None else None,
             "output_root": str(self.config.output_root),
             "total": len(results),

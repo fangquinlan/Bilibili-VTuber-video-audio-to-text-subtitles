@@ -126,11 +126,11 @@ def resolve_space_search_urls(
     *,
     space_search_url: str,
     title_must_contain: str | None = None,
-    min_duration_minutes: float = 0.0,
+    max_duration_minutes: float = 0.0,
     limit: int | None = None,
 ) -> list[str]:
     mid, keyword = _parse_space_search_url(space_search_url)
-    min_duration_seconds = max(0.0, min_duration_minutes) * 60.0
+    max_duration_seconds = max(0.0, max_duration_minutes) * 60.0
     session = _BilibiliSpaceSearchSession(space_search_url)
 
     first_page = session.fetch_page(mid=mid, keyword=keyword, page_number=1)
@@ -151,7 +151,7 @@ def resolve_space_search_urls(
                 continue
 
             duration_seconds = parse_bilibili_duration_to_seconds(str(entry.get("length") or ""))
-            if duration_seconds < min_duration_seconds:
+            if max_duration_seconds > 0.0 and duration_seconds > max_duration_seconds:
                 continue
 
             bvid = str(entry.get("bvid") or "").strip()
@@ -183,7 +183,7 @@ def resolve_space_search_urls(
     if not matched_urls:
         raise ValueError(
             "No matching videos were found for the provided Bilibili space search URL. "
-            "Try loosening title_must_contain or min_duration_minutes."
+            "Try loosening title_must_contain or max_duration_minutes."
         )
 
     logger.info(

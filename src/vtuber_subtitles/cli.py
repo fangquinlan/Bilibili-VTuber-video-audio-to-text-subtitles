@@ -41,10 +41,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional exact substring that every auto-resolved space-search result title must contain.",
     )
     run_parser.add_argument(
-        "--min-duration-minutes",
+        "--max-duration-minutes",
         type=float,
         default=0.0,
-        help="Optional minimum duration in minutes for auto-resolved space-search results.",
+        help="Optional maximum duration in minutes for auto-resolved space-search results. Videos longer than this will be filtered out.",
+    )
+    run_parser.add_argument(
+        "--min-duration-minutes",
+        dest="max_duration_minutes",
+        type=float,
+        help=argparse.SUPPRESS,
     )
     run_parser.add_argument(
         "--input-file",
@@ -134,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
             series_url=args.series_url,
             space_search_url=args.space_search_url,
             title_must_contain=args.title_must_contain,
-            min_duration_minutes=args.min_duration_minutes,
+            max_duration_minutes=args.max_duration_minutes,
             input_file=args.input_file,
             output_root=args.output_root,
             cookies=args.cookies,

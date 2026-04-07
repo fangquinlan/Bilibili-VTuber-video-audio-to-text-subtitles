@@ -91,14 +91,14 @@ python3 scripts/autodl_run.py --cookies /path/to/cookies.txt
 
 - 频道搜索页：`https://space.bilibili.com/1113769832/search?keyword=沐霂`
 - 标题必须包含：`【沐霂】`
-- 只保留 20 分钟以上视频
+- 过滤掉 20 分钟以上视频
 
 可以直接这样跑：
 
 ```bash
 SPACE_SEARCH_URL="https://space.bilibili.com/1113769832/search?keyword=%E6%B2%90%E9%9C%82" \
 TITLE_MUST_CONTAIN="【沐霂】" \
-MIN_DURATION_MINUTES="20" \
+MAX_DURATION_MINUTES="20" \
 python3 scripts/autodl_run.py
 ```
 
@@ -106,7 +106,7 @@ python3 scripts/autodl_run.py
 
 - 抓取该频道搜索页里的所有 `沐霂` 结果
 - 再过滤标题里必须带 `【沐霂】`
-- 再过滤掉 20 分钟以下的视频
+- 再过滤掉 20 分钟以上的视频
 - 最后把筛出来的视频链接按顺序送进现有下载和转写流程
 
 只跑前 3 个视频用于试跑：
