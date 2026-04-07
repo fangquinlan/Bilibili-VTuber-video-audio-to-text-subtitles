@@ -25,22 +25,30 @@
 ```bash
 git clone https://github.com/fangquinlan/Bilibili-VTuber-video-audio-to-text-subtitles.git
 cd Bilibili-VTuber-video-audio-to-text-subtitles
-bash scripts/autodl_one_click.sh
+python3 scripts/autodl_one_click.py
 ```
 
 以后复跑：
 
 ```bash
 cd Bilibili-VTuber-video-audio-to-text-subtitles
-bash scripts/autodl_run.sh
+python3 scripts/autodl_run.py
 ```
 
 如果 Hugging Face 访问较慢，可以先设置镜像再运行：
 
 ```bash
 export HF_ENDPOINT="https://hf-mirror.com"
+python3 scripts/autodl_one_click.py
+```
+
+如果你已经习惯原来的 shell 命令，也可以继续用：
+
+```bash
 bash scripts/autodl_one_click.sh
 ```
+
+现在这些 `.sh` 只是 Python 包装层，不再直接依赖子脚本执行权限，所以能避开 AutoDL 上常见的 `Permission denied`。
 
 ## 可选参数
 
@@ -52,13 +60,13 @@ OUTPUT_ROOT="$PWD/workspace/custom_run" \
 MODEL_PROVIDER="auto" \
 DEVICE="cuda" \
 LOG_LEVEL="INFO" \
-bash scripts/autodl_run.sh
+python3 scripts/autodl_run.py
 ```
 
 如果 B 站页面需要登录 cookies：
 
 ```bash
-bash scripts/autodl_run.sh --cookies /path/to/cookies.txt
+python3 scripts/autodl_run.py --cookies /path/to/cookies.txt
 ```
 
 你现在这批链接直接放进根目录的 `input.txt` 就能跑，不需要额外改代码。
@@ -66,7 +74,7 @@ bash scripts/autodl_run.sh --cookies /path/to/cookies.txt
 只跑前 3 个视频用于试跑：
 
 ```bash
-bash scripts/autodl_run.sh --limit 3
+python3 scripts/autodl_run.py --limit 3
 ```
 
 控制下载低音质小文件、并把长音频按 20 分钟切块做 ASR：
@@ -74,7 +82,7 @@ bash scripts/autodl_run.sh --limit 3
 ```bash
 AUDIO_QUALITY="low" \
 ASR_CHUNK_MINUTES="20" \
-bash scripts/autodl_run.sh
+python3 scripts/autodl_run.py
 ```
 
 ## 输出结构
