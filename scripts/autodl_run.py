@@ -45,6 +45,9 @@ def build_base_command() -> list[str]:
         env_or_default("LOG_LEVEL", DEFAULT_LOG_LEVEL),
     ]
     append_optional_env_arg(args, "RESOURCE_PROFILE", "--resource-profile")
+    append_optional_env_arg(args, "SPACE_SEARCH_URL", "--space-search-url")
+    append_optional_env_arg(args, "TITLE_MUST_CONTAIN", "--title-must-contain")
+    append_optional_env_arg(args, "MIN_DURATION_MINUTES", "--min-duration-minutes")
     append_optional_env_arg(args, "SEPARATOR_CHUNK_SECONDS", "--separator-chunk-seconds")
     append_optional_env_arg(args, "SEPARATOR_OVERLAP_SECONDS", "--separator-overlap-seconds")
     append_optional_env_arg(args, "SEPARATOR_BATCH_SIZE", "--separator-batch-size")

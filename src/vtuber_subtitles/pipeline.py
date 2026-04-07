@@ -17,6 +17,7 @@ from .downloader import (
     download_series_audio,
     load_downloaded_items,
     read_input_urls,
+    resolve_space_search_urls,
     safe_filename,
 )
 from .models import SEPARATOR_REPO_ID, ensure_firered_models, ensure_separator_model
@@ -28,6 +29,9 @@ logger = logging.getLogger(__name__)
 @dataclass(slots=True)
 class SeriesPipelineConfig:
     series_url: str = DEFAULT_SERIES_URL
+    space_search_url: str | None = None
+    title_must_contain: str | None = None
+    min_duration_minutes: float = 0.0
     input_file: Path | None = None
     output_root: Path = Path("workspace/bilibili_series_2004017")
     cookies: Path | None = None
@@ -186,9 +190,28 @@ class SeriesPipeline:
             path.mkdir(parents=True, exist_ok=True)
 
     def _download_or_load_items(self) -> list[DownloadedItem]:
+        url_order_manifest = self.config.state_dir / "url_order.json"
         if self.config.skip_download:
             logger.info("Skipping download step and reading existing raw audio files from %s", self.config.raw_dir)
-            return load_downloaded_items(self.config.raw_dir)
+            return load_downloaded_items(self.config.raw_dir, url_order_manifest=url_order_manifest)
+
+        if self.config.space_search_url:
+            logger.info("Resolving Bilibili space search URLs from %s", self.config.space_search_url)
+            urls = resolve_space_search_urls(
+                space_search_url=self.config.space_search_url,
+                title_must_contain=self.config.title_must_contain,
+                min_duration_minutes=self.config.min_duration_minutes,
+                limit=self.config.limit,
+            )
+            return download_audio_urls(
+                urls=urls,
+                raw_dir=self.config.raw_dir,
+                download_archive=self.config.state_dir / "downloaded.txt",
+                cookies=self.config.cookies,
+                limit=self.config.limit,
+                audio_quality=self.config.audio_quality,
+                url_order_manifest=url_order_manifest,
+            )
 
         if self.config.input_file is not None and self.config.input_file.exists():
             urls = read_input_urls(self.config.input_file)
@@ -201,6 +224,7 @@ class SeriesPipeline:
                     cookies=self.config.cookies,
                     limit=self.config.limit,
                     audio_quality=self.config.audio_quality,
+                    url_order_manifest=url_order_manifest,
                 )
             logger.info("%s exists but contains no usable URLs. Falling back to series_url.", self.config.input_file)
 
@@ -347,6 +371,9 @@ class SeriesPipeline:
 
         summary = {
             "series_url": self.config.series_url,
+            "space_search_url": self.config.space_search_url,
+            "title_must_contain": self.config.title_must_contain,
+            "min_duration_minutes": self.config.min_duration_minutes,
             "input_file": str(self.config.input_file) if self.config.input_file is not None else None,
             "output_root": str(self.config.output_root),
             "total": len(results),

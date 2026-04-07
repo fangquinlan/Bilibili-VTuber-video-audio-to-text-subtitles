@@ -10,6 +10,8 @@
 
 默认也会读取仓库根目录下的 `input.txt`。如果 `input.txt` 存在且里面有链接，就优先按它下载；如果为空，再回退到默认合集链接。
 
+如果你想从某个切片员频道的搜索页自动抓链接，也支持直接给 `space/search` 页面，再按标题和时长过滤。
+
 默认会根据机器资源自动调优：
 
 - 24GB+ 显存并且大内存机器，默认走更激进的分离 / ASR batch
@@ -84,6 +86,28 @@ python3 scripts/autodl_run.py --cookies /path/to/cookies.txt
 ```
 
 你现在这批链接直接放进根目录的 `input.txt` 就能跑，不需要额外改代码。
+
+如果你要从切片员频道里自动筛选，比如：
+
+- 频道搜索页：`https://space.bilibili.com/1113769832/search?keyword=沐霂`
+- 标题必须包含：`【沐霂】`
+- 只保留 20 分钟以上视频
+
+可以直接这样跑：
+
+```bash
+SPACE_SEARCH_URL="https://space.bilibili.com/1113769832/search?keyword=%E6%B2%90%E9%9C%82" \
+TITLE_MUST_CONTAIN="【沐霂】" \
+MIN_DURATION_MINUTES="20" \
+python3 scripts/autodl_run.py
+```
+
+这会自动：
+
+- 抓取该频道搜索页里的所有 `沐霂` 结果
+- 再过滤标题里必须带 `【沐霂】`
+- 再过滤掉 20 分钟以下的视频
+- 最后把筛出来的视频链接按顺序送进现有下载和转写流程
 
 只跑前 3 个视频用于试跑：
 
@@ -163,6 +187,7 @@ vtuber-subtitles run-series \
 
 - 下载：`yt-dlp`
 - 输入源：优先读取根目录 `input.txt`，支持一行一个链接，空行和 `#` 注释会自动跳过
+- 也支持直接读取 B 站 UP 空间搜索页，并按标题子串和最小时长过滤后自动生成待下载链接
 - 人声分离：`HiDolen/Mini-BS-RoFormer-V2-46.8M`
 - 语音识别：`FireRedTeam/FireRedASR2-AED`
 - 辅助模块：`FireRedVAD`、`FireRedLID`、`FireRedPunc`

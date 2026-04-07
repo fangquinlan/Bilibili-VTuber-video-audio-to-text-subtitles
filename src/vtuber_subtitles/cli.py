@@ -31,6 +31,22 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run-series", help="Run the full Bilibili VTuber subtitle pipeline.")
     run_parser.add_argument("--series-url", default=DEFAULT_SERIES_URL, help="Bilibili series URL to process.")
     run_parser.add_argument(
+        "--space-search-url",
+        default=None,
+        help="Optional Bilibili uploader search URL like https://space.bilibili.com/<mid>/search?keyword=... . When provided, it takes precedence over input.txt and series-url.",
+    )
+    run_parser.add_argument(
+        "--title-must-contain",
+        default=None,
+        help="Optional exact substring that every auto-resolved space-search result title must contain.",
+    )
+    run_parser.add_argument(
+        "--min-duration-minutes",
+        type=float,
+        default=0.0,
+        help="Optional minimum duration in minutes for auto-resolved space-search results.",
+    )
+    run_parser.add_argument(
         "--input-file",
         type=Path,
         default=Path("input.txt"),
@@ -116,6 +132,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run-series":
         config = SeriesPipelineConfig(
             series_url=args.series_url,
+            space_search_url=args.space_search_url,
+            title_must_contain=args.title_must_contain,
+            min_duration_minutes=args.min_duration_minutes,
             input_file=args.input_file,
             output_root=args.output_root,
             cookies=args.cookies,
