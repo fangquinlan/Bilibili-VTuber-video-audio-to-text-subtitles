@@ -5,12 +5,27 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import yt_dlp
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SERIES_URL = "https://space.bilibili.com/1878154667/lists/2004017?type=series"
+TRACKING_QUERY_KEYS = {
+    "spm_id_from",
+    "vd_source",
+    "from_spmid",
+    "from_source",
+    "share_source",
+    "share_medium",
+    "share_plat",
+    "share_session_id",
+    "share_tag",
+    "timestamp",
+    "bbid",
+    "ts",
+}
 
 
 @dataclass(slots=True)
@@ -32,12 +47,36 @@ def download_series_audio(
     download_archive: Path,
     cookies: Path | None = None,
     limit: int | None = None,
+    audio_quality: str = "low",
+) -> list[DownloadedItem]:
+    return download_audio_urls(
+        urls=[series_url],
+        raw_dir=raw_dir,
+        download_archive=download_archive,
+        cookies=cookies,
+        limit=limit,
+        audio_quality=audio_quality,
+    )
+
+
+def download_audio_urls(
+    *,
+    urls: list[str],
+    raw_dir: Path,
+    download_archive: Path,
+    cookies: Path | None = None,
+    limit: int | None = None,
+    audio_quality: str = "low",
 ) -> list[DownloadedItem]:
     raw_dir.mkdir(parents=True, exist_ok=True)
     download_archive.parent.mkdir(parents=True, exist_ok=True)
 
+    normalized_urls = dedupe_urls(urls)
+    if not normalized_urls:
+        raise ValueError("No downloadable URLs were provided.")
+
     ydl_opts: dict[str, object] = {
-        "format": "bestaudio/best",
+        "format": select_audio_format(audio_quality),
         "ignoreerrors": True,
         "noplaylist": False,
         "outtmpl": str(raw_dir / "%(id)s" / "source.%(ext)s"),
@@ -53,11 +92,56 @@ def download_series_audio(
     if limit is not None:
         ydl_opts["playlistend"] = limit
 
-    logger.info("Downloading Bilibili series audio from %s", series_url)
+    logger.info("Downloading %d input URL(s) with audio_quality=%s", len(normalized_urls), audio_quality)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([series_url])
+        ydl.download(normalized_urls)
 
     return load_downloaded_items(raw_dir)
+
+
+def read_input_urls(input_file: Path) -> list[str]:
+    urls: list[str] = []
+    for raw_line in input_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        urls.append(line)
+    return dedupe_urls(urls)
+
+
+def dedupe_urls(urls: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for url in urls:
+        normalized = normalize_source_url(url)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def normalize_source_url(url: str) -> str:
+    split = urlsplit(url.strip())
+    query_pairs = []
+    for key, value in parse_qsl(split.query, keep_blank_values=False):
+        if key in TRACKING_QUERY_KEYS:
+            continue
+        query_pairs.append((key, value))
+    normalized_query = urlencode(sorted(query_pairs))
+    normalized_path = split.path.rstrip("/") or "/"
+    return urlunsplit((split.scheme, split.netloc, normalized_path, normalized_query, ""))
+
+
+def select_audio_format(audio_quality: str) -> str:
+    quality = audio_quality.lower()
+    if quality == "low":
+        return "worstaudio/worst/bestaudio/best"
+    if quality == "standard":
+        return "bestaudio/best"
+    if quality == "best":
+        return "bestaudio/best"
+    raise ValueError(f"Unsupported audio quality: {audio_quality}")
 
 
 def load_downloaded_items(raw_dir: Path) -> list[DownloadedItem]:

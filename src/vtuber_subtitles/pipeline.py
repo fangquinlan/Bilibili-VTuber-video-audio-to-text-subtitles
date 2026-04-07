@@ -9,7 +9,15 @@ from tqdm import tqdm
 
 from .asr import FireRedTranscriber, FireRedTranscriberConfig
 from .audio import convert_for_asr, convert_for_separator, ensure_ffmpeg_available
-from .downloader import DEFAULT_SERIES_URL, DownloadedItem, download_series_audio, load_downloaded_items, safe_filename
+from .downloader import (
+    DEFAULT_SERIES_URL,
+    DownloadedItem,
+    download_audio_urls,
+    download_series_audio,
+    load_downloaded_items,
+    read_input_urls,
+    safe_filename,
+)
 from .models import SEPARATOR_REPO_ID, ensure_firered_models, ensure_separator_model
 from .separator import VocalSeparator, VocalSeparatorConfig
 
@@ -19,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass(slots=True)
 class SeriesPipelineConfig:
     series_url: str = DEFAULT_SERIES_URL
+    input_file: Path | None = None
     output_root: Path = Path("workspace/bilibili_series_2004017")
     cookies: Path | None = None
     limit: int | None = None
@@ -34,10 +43,13 @@ class SeriesPipelineConfig:
     separator_batch_size: int = 2
     asr_batch_size: int = 1
     punc_batch_size: int = 4
+    asr_chunk_minutes: float = 20.0
+    audio_quality: str = "low"
     hf_token: str | None = None
 
     def __post_init__(self) -> None:
         self.output_root = Path(self.output_root)
+        self.input_file = Path(self.input_file) if self.input_file is not None else None
         self.cookies = Path(self.cookies) if self.cookies is not None else None
 
     @property
@@ -121,6 +133,7 @@ class SeriesPipeline:
                     device=self.config.device,
                     asr_batch_size=self.config.asr_batch_size,
                     punc_batch_size=self.config.punc_batch_size,
+                    max_chunk_minutes=self.config.asr_chunk_minutes,
                 )
             )
 
@@ -160,12 +173,27 @@ class SeriesPipeline:
             logger.info("Skipping download step and reading existing raw audio files from %s", self.config.raw_dir)
             return load_downloaded_items(self.config.raw_dir)
 
+        if self.config.input_file is not None and self.config.input_file.exists():
+            urls = read_input_urls(self.config.input_file)
+            if urls:
+                logger.info("Using %s as the download source list.", self.config.input_file)
+                return download_audio_urls(
+                    urls=urls,
+                    raw_dir=self.config.raw_dir,
+                    download_archive=self.config.state_dir / "downloaded.txt",
+                    cookies=self.config.cookies,
+                    limit=self.config.limit,
+                    audio_quality=self.config.audio_quality,
+                )
+            logger.info("%s exists but contains no usable URLs. Falling back to series_url.", self.config.input_file)
+
         return download_series_audio(
             series_url=self.config.series_url,
             raw_dir=self.config.raw_dir,
             download_archive=self.config.state_dir / "downloaded.txt",
             cookies=self.config.cookies,
             limit=self.config.limit,
+            audio_quality=self.config.audio_quality,
         )
 
     def _process_one(
@@ -222,7 +250,11 @@ class SeriesPipeline:
             )
 
         assert transcriber is not None
-        result = transcriber.transcribe_to_text(asr_input, uttid=item.video_id)
+        result = transcriber.transcribe_to_text(
+            asr_input,
+            uttid=item.video_id,
+            chunk_dir=item_dir / "asr_chunks",
+        )
         transcriber.write_outputs(
             result,
             result_json_path=item_dir / "result.json",
@@ -261,6 +293,7 @@ class SeriesPipeline:
 
         summary = {
             "series_url": self.config.series_url,
+            "input_file": str(self.config.input_file) if self.config.input_file is not None else None,
             "output_root": str(self.config.output_root),
             "total": len(results),
             "done": sum(result.status == "done" for result in results),

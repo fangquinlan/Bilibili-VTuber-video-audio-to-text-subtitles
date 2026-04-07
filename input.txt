@@ -1,0 +1,10 @@
+# One Bilibili URL per line.
+# Blank lines and lines starting with # are ignored.
+# If this file exists and is non-empty, the pipeline will use it instead of the default series URL.
+
+https://www.bilibili.com/video/BV1fBSDBAEk8/?spm_id_from=333.1387.collection.video_card.click
+https://www.bilibili.com/video/BV1fBSDBAEk8?spm_id_from=333.788.videopod.episodes&vd_source=8aeb134b520a30a50d05e839a246898d&p=2
+https://www.bilibili.com/video/BV13j9wBZE2o/?spm_id_from=333.1387.collection.video_card.click
+https://www.bilibili.com/video/BV13j9wBZE2o?spm_id_from=333.788.videopod.episodes&vd_source=8aeb134b520a30a50d05e839a246898d&p=2
+https://www.bilibili.com/video/BV1NewdzsEQF/?spm_id_from=333.1387.collection.video_card.click
+https://www.bilibili.com/video/BV1NewdzsEQF/?spm_id_from=333.1387.collection.video_card.click&vd_source=8aeb134b520a30a50d05e839a246898d

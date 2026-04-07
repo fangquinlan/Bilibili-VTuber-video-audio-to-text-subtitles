@@ -19,6 +19,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run-series", help="Run the full Bilibili VTuber subtitle pipeline.")
     run_parser.add_argument("--series-url", default=DEFAULT_SERIES_URL, help="Bilibili series URL to process.")
     run_parser.add_argument(
+        "--input-file",
+        type=Path,
+        default=Path("input.txt"),
+        help="Optional txt file with one Bilibili URL per line. If the file exists and is non-empty, it takes precedence over --series-url.",
+    )
+    run_parser.add_argument(
         "--output-root",
         type=Path,
         default=Path("workspace/bilibili_series_2004017"),
@@ -43,6 +49,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--separator-batch-size", type=int, default=2, help="Batch size passed to model.separate().")
     run_parser.add_argument("--asr-batch-size", type=int, default=1, help="FireRed ASR batch size per VAD segment.")
     run_parser.add_argument("--punc-batch-size", type=int, default=4, help="FireRed punctuation batch size.")
+    run_parser.add_argument("--asr-chunk-minutes", type=float, default=20.0, help="Split long vocal tracks into fixed-size chunks before FireRed ASR.")
+    run_parser.add_argument(
+        "--audio-quality",
+        choices=["low", "standard", "best"],
+        default="low",
+        help="yt-dlp audio selection strategy. Default is low to prefer smaller downloads.",
+    )
     run_parser.add_argument("--hf-token", default=None, help="Optional Hugging Face token.")
     run_parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Python logging level.")
     return parser
@@ -60,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run-series":
         config = SeriesPipelineConfig(
             series_url=args.series_url,
+            input_file=args.input_file,
             output_root=args.output_root,
             cookies=args.cookies,
             limit=args.limit,
@@ -75,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
             separator_batch_size=args.separator_batch_size,
             asr_batch_size=args.asr_batch_size,
             punc_batch_size=args.punc_batch_size,
+            asr_chunk_minutes=args.asr_chunk_minutes,
+            audio_quality=args.audio_quality,
             hf_token=args.hf_token,
         )
         results = SeriesPipeline(config).run()
