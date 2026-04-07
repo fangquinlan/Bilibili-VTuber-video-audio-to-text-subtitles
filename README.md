@@ -50,6 +50,12 @@ bash scripts/autodl_one_click.sh
 
 现在这些 `.sh` 只是 Python 包装层，不再直接依赖子脚本执行权限，所以能避开 AutoDL 上常见的 `Permission denied`。
 
+如果 `conda create` 因为 AutoDL 机器里旧镜像源报错，脚本会自动回退到 `--override-channels -c defaults` 重试。也可以手动指定：
+
+```bash
+CONDA_CREATE_CHANNELS="defaults" python3 scripts/autodl_one_click.py
+```
+
 ## 可选参数
 
 直接改环境变量即可：

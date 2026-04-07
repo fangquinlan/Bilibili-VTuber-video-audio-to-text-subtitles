@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import subprocess
 import sys
 
 from autodl_common import (
@@ -16,6 +17,55 @@ from autodl_common import (
 DEFAULT_CONDA_ENV_NAME = "vtuber_subtitles"
 DEFAULT_PYTHON_VERSION = "3.10"
 DEFAULT_FIRERED_COMMIT = "466c9bb718240132f42ec1b9df14cc6aecae587d"
+DEFAULT_CONDA_CREATE_CHANNELS = "defaults"
+
+
+def parse_channel_list(raw_value: str) -> list[str]:
+    return [item for item in raw_value.replace(",", " ").split() if item]
+
+
+def build_conda_create_command(
+    conda_exe: str,
+    env_name: str,
+    python_version: str,
+    *,
+    override_channels: bool = False,
+    channels: list[str] | None = None,
+) -> list[str]:
+    command = [conda_exe, "create", "-y", "-n", env_name]
+    if override_channels and channels:
+        command.append("--override-channels")
+        for channel in channels:
+            command.extend(["-c", channel])
+    command.append(f"python={python_version}")
+    return command
+
+
+def create_conda_env(conda_exe: str, env_name: str, python_version: str) -> None:
+    try:
+        run(build_conda_create_command(conda_exe, env_name, python_version))
+        return
+    except subprocess.CalledProcessError:
+        fallback_channels = parse_channel_list(env_or_default("CONDA_CREATE_CHANNELS", DEFAULT_CONDA_CREATE_CHANNELS))
+        if not fallback_channels:
+            raise
+
+        channel_text = ", ".join(fallback_channels)
+        print(
+            "Conda create failed with the current channel configuration. "
+            f"Retrying with override channels: {channel_text}",
+            file=sys.stderr,
+            flush=True,
+        )
+        run(
+            build_conda_create_command(
+                conda_exe,
+                env_name,
+                python_version,
+                override_channels=True,
+                channels=fallback_channels,
+            )
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     conda_exe = require_conda_executable()
 
     if not conda_env_exists(conda_exe, conda_env_name):
-        run([conda_exe, "create", "-y", "-n", conda_env_name, f"python={python_version}"])
+        create_conda_env(conda_exe, conda_env_name, python_version)
 
     conda_run(conda_exe, conda_env_name, ["python", "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"])
     conda_run(
