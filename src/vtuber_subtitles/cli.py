@@ -9,6 +9,18 @@ from .downloader import DEFAULT_SERIES_URL
 from .pipeline import SeriesPipeline, SeriesPipelineConfig
 
 
+def _parse_optional_int(value: str) -> int | None:
+    if value.lower() == "auto":
+        return None
+    return int(value)
+
+
+def _parse_optional_float(value: str) -> float | None:
+    if value.lower() == "auto":
+        return None
+    return float(value)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="vtuber-subtitles",
@@ -43,13 +55,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Where to download FireRed models from. Auto tries ModelScope first, then Hugging Face.",
     )
     run_parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto", help="Inference device for separator and ASR.")
+    run_parser.add_argument(
+        "--resource-profile",
+        choices=["auto", "conservative", "balanced", "aggressive"],
+        default="auto",
+        help="Auto-tune chunk size and batch sizes for available GPU/RAM, or force a specific profile.",
+    )
     run_parser.add_argument("--separator-model-repo", default="HiDolen/Mini-BS-RoFormer-V2-46.8M", help="Hugging Face repo id for the separator model.")
-    run_parser.add_argument("--separator-chunk-seconds", type=float, default=30.0, help="Separator chunk size in seconds.")
+    run_parser.add_argument(
+        "--separator-chunk-seconds",
+        type=_parse_optional_float,
+        default=None,
+        help="Separator chunk size in seconds. Omit or use 'auto' to tune from hardware.",
+    )
     run_parser.add_argument("--separator-overlap-seconds", type=float, default=2.0, help="Separator overlap size in seconds.")
-    run_parser.add_argument("--separator-batch-size", type=int, default=2, help="Batch size passed to model.separate().")
-    run_parser.add_argument("--asr-batch-size", type=int, default=1, help="FireRed ASR batch size per VAD segment.")
-    run_parser.add_argument("--punc-batch-size", type=int, default=4, help="FireRed punctuation batch size.")
-    run_parser.add_argument("--asr-chunk-minutes", type=float, default=20.0, help="Split long vocal tracks into fixed-size chunks before FireRed ASR.")
+    run_parser.add_argument(
+        "--separator-batch-size",
+        type=_parse_optional_int,
+        default=None,
+        help="Batch size passed to model.separate(). Omit or use 'auto' to tune from hardware.",
+    )
+    run_parser.add_argument(
+        "--asr-batch-size",
+        type=_parse_optional_int,
+        default=None,
+        help="FireRed ASR batch size per VAD segment. Omit or use 'auto' to tune from hardware.",
+    )
+    run_parser.add_argument(
+        "--punc-batch-size",
+        type=_parse_optional_int,
+        default=None,
+        help="FireRed punctuation batch size. Omit or use 'auto' to tune from hardware.",
+    )
+    run_parser.add_argument(
+        "--asr-chunk-minutes",
+        type=_parse_optional_float,
+        default=None,
+        help="Split long vocal tracks into fixed-size chunks before FireRed ASR. Omit or use 'auto' to tune from RAM.",
+    )
     run_parser.add_argument(
         "--audio-quality",
         choices=["low", "standard", "best"],
@@ -83,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
             skip_asr=args.skip_asr,
             model_provider=args.model_provider,
             device=args.device,
+            resource_profile=args.resource_profile,
             separator_model_repo=args.separator_model_repo,
             separator_chunk_seconds=args.separator_chunk_seconds,
             separator_overlap_seconds=args.separator_overlap_seconds,

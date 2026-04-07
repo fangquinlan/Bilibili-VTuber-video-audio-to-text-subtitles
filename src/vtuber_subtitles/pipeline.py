@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -37,13 +38,14 @@ class SeriesPipelineConfig:
     skip_asr: bool = False
     model_provider: str = "auto"
     device: str = "auto"
+    resource_profile: str = "auto"
     separator_model_repo: str = SEPARATOR_REPO_ID
-    separator_chunk_seconds: float = 30.0
+    separator_chunk_seconds: float | None = None
     separator_overlap_seconds: float = 2.0
-    separator_batch_size: int = 2
-    asr_batch_size: int = 1
-    punc_batch_size: int = 4
-    asr_chunk_minutes: float = 20.0
+    separator_batch_size: int | None = None
+    asr_batch_size: int | None = None
+    punc_batch_size: int | None = None
+    asr_chunk_minutes: float | None = None
     audio_quality: str = "low"
     hf_token: str | None = None
 
@@ -91,6 +93,19 @@ class ProcessResult:
     error: str = ""
 
 
+@dataclass(slots=True)
+class ResourceTuning:
+    profile: str
+    gpu_name: str | None
+    gpu_memory_gb: float | None
+    system_memory_gb: float | None
+    separator_chunk_seconds: float
+    separator_batch_size: int
+    asr_batch_size: int
+    punc_batch_size: int
+    asr_chunk_minutes: float
+
+
 class SeriesPipeline:
     def __init__(self, config: SeriesPipelineConfig) -> None:
         self.config = config
@@ -98,6 +113,7 @@ class SeriesPipeline:
     def run(self) -> list[ProcessResult]:
         self._prepare_workspace()
         ensure_ffmpeg_available()
+        tuning = _resolve_resource_tuning(self.config)
 
         items = self._download_or_load_items()
         if not items:
@@ -114,9 +130,9 @@ class SeriesPipeline:
                 VocalSeparatorConfig(
                     model_dir=self.config.separator_model_dir,
                     device=self.config.device,
-                    chunk_seconds=self.config.separator_chunk_seconds,
+                    chunk_seconds=tuning.separator_chunk_seconds,
                     overlap_seconds=self.config.separator_overlap_seconds,
-                    batch_size=self.config.separator_batch_size,
+                    batch_size=tuning.separator_batch_size,
                 )
             )
 
@@ -131,9 +147,9 @@ class SeriesPipeline:
                 FireRedTranscriberConfig(
                     model_root=self.config.firered_model_root,
                     device=self.config.device,
-                    asr_batch_size=self.config.asr_batch_size,
-                    punc_batch_size=self.config.punc_batch_size,
-                    max_chunk_minutes=self.config.asr_chunk_minutes,
+                    asr_batch_size=tuning.asr_batch_size,
+                    punc_batch_size=tuning.punc_batch_size,
+                    max_chunk_minutes=tuning.asr_chunk_minutes,
                 )
             )
 
@@ -154,7 +170,8 @@ class SeriesPipeline:
                     )
                 )
 
-        self._write_manifest(results)
+        merged_subtitle_path = self._write_merged_subtitles(results)
+        self._write_manifest(results, tuning=tuning, merged_subtitle_path=merged_subtitle_path)
         return results
 
     def _prepare_workspace(self) -> None:
@@ -284,7 +301,44 @@ class SeriesPipeline:
         with (item_dir / "metadata.json").open("w", encoding="utf-8") as handle:
             json.dump(metadata, handle, ensure_ascii=False, indent=2)
 
-    def _write_manifest(self, results: list[ProcessResult]) -> None:
+    def _write_merged_subtitles(self, results: list[ProcessResult]) -> str | None:
+        merged_blocks: list[str] = []
+        for result in sorted(results, key=lambda item: (item.playlist_index, item.video_id)):
+            if not result.subtitle_path:
+                continue
+
+            subtitle_path = Path(result.subtitle_path)
+            if not subtitle_path.exists():
+                continue
+
+            text = subtitle_path.read_text(encoding="utf-8").strip()
+            if not text:
+                continue
+
+            merged_blocks.append(
+                "\n".join(
+                    [
+                        f"### {result.playlist_index:03d} {result.title}",
+                        text,
+                    ]
+                )
+            )
+
+        if not merged_blocks:
+            return None
+
+        merged_path = self.config.subtitles_dir / "all_subtitles_merged.txt"
+        merged_path.write_text("\n\n".join(merged_blocks).rstrip() + "\n", encoding="utf-8")
+        logger.info("Wrote merged subtitle text to %s", merged_path)
+        return str(merged_path)
+
+    def _write_manifest(
+        self,
+        results: list[ProcessResult],
+        *,
+        tuning: ResourceTuning,
+        merged_subtitle_path: str | None,
+    ) -> None:
         manifest_path = self.config.state_dir / "manifest.jsonl"
         summary_path = self.config.state_dir / "summary.json"
         with manifest_path.open("w", encoding="utf-8") as handle:
@@ -299,7 +353,116 @@ class SeriesPipeline:
             "done": sum(result.status == "done" for result in results),
             "skipped": sum(result.status == "skipped" for result in results),
             "failed": sum(result.status == "failed" for result in results),
+            "merged_subtitle_path": merged_subtitle_path,
+            "resource_tuning": asdict(tuning),
             "results": [asdict(result) for result in results],
         }
         with summary_path.open("w", encoding="utf-8") as handle:
             json.dump(summary, handle, ensure_ascii=False, indent=2)
+
+
+def _resolve_resource_tuning(config: SeriesPipelineConfig) -> ResourceTuning:
+    gpu_name, gpu_memory_gb = _detect_gpu(config.device)
+    system_memory_gb = _detect_system_memory_gb()
+    profile = _resolve_profile(config.resource_profile, config.device, gpu_memory_gb, system_memory_gb)
+    defaults = _profile_defaults(profile)
+
+    tuning = ResourceTuning(
+        profile=profile,
+        gpu_name=gpu_name,
+        gpu_memory_gb=gpu_memory_gb,
+        system_memory_gb=system_memory_gb,
+        separator_chunk_seconds=config.separator_chunk_seconds or defaults["separator_chunk_seconds"],
+        separator_batch_size=config.separator_batch_size or defaults["separator_batch_size"],
+        asr_batch_size=config.asr_batch_size or defaults["asr_batch_size"],
+        punc_batch_size=config.punc_batch_size or defaults["punc_batch_size"],
+        asr_chunk_minutes=config.asr_chunk_minutes or defaults["asr_chunk_minutes"],
+    )
+    logger.info(
+        "Resource tuning profile=%s gpu=%s gpu_memory_gb=%s system_memory_gb=%s "
+        "separator_chunk_seconds=%.1f separator_batch_size=%d asr_batch_size=%d "
+        "punc_batch_size=%d asr_chunk_minutes=%.1f",
+        tuning.profile,
+        tuning.gpu_name or "cpu",
+        f"{tuning.gpu_memory_gb:.1f}" if tuning.gpu_memory_gb is not None else "n/a",
+        f"{tuning.system_memory_gb:.1f}" if tuning.system_memory_gb is not None else "n/a",
+        tuning.separator_chunk_seconds,
+        tuning.separator_batch_size,
+        tuning.asr_batch_size,
+        tuning.punc_batch_size,
+        tuning.asr_chunk_minutes,
+    )
+    return tuning
+
+
+def _resolve_profile(
+    requested_profile: str,
+    device: str,
+    gpu_memory_gb: float | None,
+    system_memory_gb: float | None,
+) -> str:
+    if requested_profile != "auto":
+        return requested_profile
+    if device == "cpu" or gpu_memory_gb is None:
+        return "conservative"
+    if gpu_memory_gb >= 24 and (system_memory_gb or 0) >= 64:
+        return "aggressive"
+    if gpu_memory_gb >= 12:
+        return "balanced"
+    return "conservative"
+
+
+def _profile_defaults(profile: str) -> dict[str, float | int]:
+    presets: dict[str, dict[str, float | int]] = {
+        "conservative": {
+            "separator_chunk_seconds": 30.0,
+            "separator_batch_size": 2,
+            "asr_batch_size": 1,
+            "punc_batch_size": 4,
+            "asr_chunk_minutes": 20.0,
+        },
+        "balanced": {
+            "separator_chunk_seconds": 45.0,
+            "separator_batch_size": 4,
+            "asr_batch_size": 4,
+            "punc_batch_size": 8,
+            "asr_chunk_minutes": 30.0,
+        },
+        "aggressive": {
+            "separator_chunk_seconds": 60.0,
+            "separator_batch_size": 8,
+            "asr_batch_size": 8,
+            "punc_batch_size": 16,
+            "asr_chunk_minutes": 45.0,
+        },
+    }
+    if profile not in presets:
+        raise ValueError(f"Unsupported resource profile: {profile}")
+    return presets[profile]
+
+
+def _detect_gpu(device: str) -> tuple[str | None, float | None]:
+    try:
+        import torch
+    except ImportError:
+        return None, None
+
+    if device == "cpu" or not torch.cuda.is_available():
+        return None, None
+
+    torch_device = torch.device("cuda" if device == "auto" else device)
+    device_index = torch_device.index if torch_device.index is not None else torch.cuda.current_device()
+    properties = torch.cuda.get_device_properties(device_index)
+    return properties.name, properties.total_memory / (1024**3)
+
+
+def _detect_system_memory_gb() -> float | None:
+    if hasattr(os, "sysconf"):
+        page_size_name = "SC_PAGE_SIZE"
+        pages_name = "SC_PHYS_PAGES"
+        if page_size_name in os.sysconf_names and pages_name in os.sysconf_names:
+            page_size = os.sysconf(page_size_name)
+            total_pages = os.sysconf(pages_name)
+            if isinstance(page_size, int) and isinstance(total_pages, int) and page_size > 0 and total_pages > 0:
+                return page_size * total_pages / (1024**3)
+    return None

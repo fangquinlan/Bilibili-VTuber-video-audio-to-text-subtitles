@@ -10,6 +10,11 @@
 
 默认也会读取仓库根目录下的 `input.txt`。如果 `input.txt` 存在且里面有链接，就优先按它下载；如果为空，再回退到默认合集链接。
 
+默认会根据机器资源自动调优：
+
+- 24GB+ 显存并且大内存机器，默认走更激进的分离 / ASR batch
+- 跑完后会在 `subtitles/` 目录下自动生成一个按顺序合并的总文本
+
 ## 适用环境
 
 - AutoDL Linux 服务器
@@ -94,11 +99,29 @@ ASR_CHUNK_MINUTES="20" \
 python3 scripts/autodl_run.py
 ```
 
+如果你想更主动吃满 32GB 显存，可以切到激进档：
+
+```bash
+RESOURCE_PROFILE="aggressive" python3 scripts/autodl_run.py
+```
+
+也可以手动指定：
+
+```bash
+SEPARATOR_BATCH_SIZE="8" \
+ASR_BATCH_SIZE="8" \
+PUNC_BATCH_SIZE="16" \
+SEPARATOR_CHUNK_SECONDS="60" \
+ASR_CHUNK_MINUTES="45" \
+python3 scripts/autodl_run.py
+```
+
 ## 输出结构
 
 运行完成后，主要结果在：
 
 - `workspace/bilibili_series_2004017/subtitles/*.txt`
+- `workspace/bilibili_series_2004017/subtitles/all_subtitles_merged.txt`
 
 同时会保留中间文件，方便断点续跑：
 
@@ -107,6 +130,8 @@ python3 scripts/autodl_run.py
 - `workspace/bilibili_series_2004017/models/`
 - `workspace/bilibili_series_2004017/state/manifest.jsonl`
 - `workspace/bilibili_series_2004017/state/summary.json`
+
+`all_subtitles_merged.txt` 会按合集顺序，把每个视频的字幕自动拼成一个总文本。
 
 每个视频在 `work/` 目录下会保留：
 

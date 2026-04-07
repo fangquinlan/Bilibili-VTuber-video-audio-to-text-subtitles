@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import sys
 
 from autodl_common import PROJECT_ROOT, conda_env_exists, conda_run, env_or_default, require_conda_executable
@@ -13,11 +14,17 @@ DEFAULT_DEVICE = "auto"
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_INPUT_FILE = str(PROJECT_ROOT / "input.txt")
 DEFAULT_AUDIO_QUALITY = "low"
-DEFAULT_ASR_CHUNK_MINUTES = "20"
+
+
+def append_optional_env_arg(args: list[str], env_name: str, flag: str) -> None:
+    value = os.environ.get(env_name)
+    if value is None or not value.strip():
+        return
+    args.extend([flag, value.strip()])
 
 
 def build_base_command() -> list[str]:
-    return [
+    args = [
         "python",
         "-m",
         "vtuber_subtitles.cli",
@@ -34,11 +41,17 @@ def build_base_command() -> list[str]:
         env_or_default("DEVICE", DEFAULT_DEVICE),
         "--audio-quality",
         env_or_default("AUDIO_QUALITY", DEFAULT_AUDIO_QUALITY),
-        "--asr-chunk-minutes",
-        env_or_default("ASR_CHUNK_MINUTES", DEFAULT_ASR_CHUNK_MINUTES),
         "--log-level",
         env_or_default("LOG_LEVEL", DEFAULT_LOG_LEVEL),
     ]
+    append_optional_env_arg(args, "RESOURCE_PROFILE", "--resource-profile")
+    append_optional_env_arg(args, "SEPARATOR_CHUNK_SECONDS", "--separator-chunk-seconds")
+    append_optional_env_arg(args, "SEPARATOR_OVERLAP_SECONDS", "--separator-overlap-seconds")
+    append_optional_env_arg(args, "SEPARATOR_BATCH_SIZE", "--separator-batch-size")
+    append_optional_env_arg(args, "ASR_BATCH_SIZE", "--asr-batch-size")
+    append_optional_env_arg(args, "PUNC_BATCH_SIZE", "--punc-batch-size")
+    append_optional_env_arg(args, "ASR_CHUNK_MINUTES", "--asr-chunk-minutes")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
